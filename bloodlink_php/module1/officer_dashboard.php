@@ -268,3 +268,4 @@ $health_opts = ['Healthy','Under Medication','Not Eligible'];
 </div>
 
 <?php include 'footer.php'; ?>
+
