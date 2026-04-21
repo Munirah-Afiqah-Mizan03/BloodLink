@@ -7,6 +7,12 @@ $activePage = 'events';
 $pageTitle  = 'Add New Event';
 $errors     = [];
 
+$current_user_display = trim($_SESSION['full_name'] ?? '');
+if (($_SESSION['role'] ?? '') === 'medical_officer' && $current_user_display && !preg_match('/^dr\b/i', $current_user_display)) {
+    $current_user_display = 'Dr. ' . $current_user_display;
+}
+if (!$current_user_display) $current_user_display = 'System';
+
 // ── HANDLE FORM SUBMIT ────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $event_name  = trim($_POST['event_name']  ?? '');
@@ -15,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $partner     = trim($_POST['partner']     ?? '');
     $description = trim($_POST['description'] ?? '');
     $status      = trim($_POST['status']      ?? 'Upcoming');
-    $created_by  = 'Dr. Siti Aminah'; // Replace with session user
+    $created_by  = $current_user_display;
 
     // Validate
     if (!$event_name) $errors[] = 'Event name is required.';
@@ -164,7 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <div class="bl-field">
             <label>Created by</label>
             <div class="bl-auto-field">
-              <span>Dr. Siti Aminah</span><span class="bl-auto-tag">Auto</span>
+              <span><?php echo htmlspecialchars($current_user_display); ?></span><span class="bl-auto-tag">Auto</span>
             </div>
           </div>
           <div class="bl-field">
