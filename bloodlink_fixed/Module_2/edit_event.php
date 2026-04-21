@@ -190,7 +190,7 @@ $vol_count = $vc->get_result()->fetch_assoc()['c'];
           <div class="bl-field">
             <label>Created by</label>
             <div class="bl-auto-field">
-              <span><?php echo htmlspecialchars($event['created_by'] ?? 'Dr. Siti Aminah'); ?></span>
+              <span><?php echo htmlspecialchars($event['created_by'] ?? ''); ?></span>
               <span class="bl-auto-tag">Auto</span>
             </div>
           </div>
