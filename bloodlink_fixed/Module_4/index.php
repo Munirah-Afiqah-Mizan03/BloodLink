@@ -213,8 +213,9 @@ unset($_SESSION['flash']);
                 ?>
                 <span class="bl-badge <?php echo $cls; ?>"><?php echo $row['status']; ?></span>
               </td>
-              <td>
+              <td style="display:flex;gap:6px;align-items:center">
                 <a href="edit_record.php?id=<?php echo $row['id']; ?>" class="bl-btn bl-btn-sm bl-btn-edit">Edit</a>
+                <a href="delete_record.php?id=<?php echo $row['id']; ?>" class="bl-btn bl-btn-sm bl-btn-danger">Delete</a>
               </td>
             </tr>
             <?php endwhile; ?>
