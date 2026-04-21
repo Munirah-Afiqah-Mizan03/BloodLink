@@ -8,6 +8,12 @@ $pageTitle  = 'Assign Volunteers';
 $errors     = [];
 $success    = false;
 
+$current_user_display = trim($_SESSION['full_name'] ?? '');
+if (($_SESSION['role'] ?? '') === 'medical_officer' && $current_user_display && !preg_match('/^dr\b/i', $current_user_display)) {
+    $current_user_display = 'Dr. ' . $current_user_display;
+}
+if (!$current_user_display) $current_user_display = 'System';
+
 $id = intval($_GET['id'] ?? 0);
 if (!$id) { header('Location: index.php'); exit; }
 
@@ -33,7 +39,7 @@ if (isset($_GET['remove'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $vol_name    = trim($_POST['vol_name']    ?? '');
     $vol_role    = trim($_POST['vol_role']    ?? '');
-    $assigned_by = 'Dr. Siti Aminah';
+    $assigned_by = $current_user_display;
 
     if (!$vol_name) $errors[] = 'Volunteer name is required.';
     if (!$vol_role) $errors[] = 'Please select a role.';
