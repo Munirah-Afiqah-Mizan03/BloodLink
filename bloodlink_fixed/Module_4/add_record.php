@@ -7,6 +7,12 @@ $pageTitle  = 'Add New Record';
 $errors     = [];
 $success    = false;
 
+$current_user_display = trim($_SESSION['full_name'] ?? '');
+if (($_SESSION['role'] ?? '') === 'medical_officer' && $current_user_display && !preg_match('/^dr\b/i', $current_user_display)) {
+    $current_user_display = 'Dr. ' . $current_user_display;
+}
+if (!$current_user_display) $current_user_display = 'System';
+
 // ── HANDLE FORM SUBMIT ────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $donor_id_code  = trim($_POST['donor_id_code'] ?? '');
@@ -18,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $blood_pressure = trim($_POST['blood_pressure'] ?? '');
     $haemoglobin    = trim($_POST['haemoglobin']    ?? '');
     $remarks        = trim($_POST['remarks']        ?? '');
-    $recorded_by    = 'Dr. Siti Aminah'; // Replace with session user
+    $recorded_by    = $current_user_display;
 
     // ── VALIDATE ─────────────────────────────────────────────
     if (!$donor_id_code) $errors[] = 'Donor ID is required.';
@@ -268,7 +274,7 @@ $events = $conn->query(
           <div class="bl-field">
             <label>Recorded by</label>
             <div class="bl-auto-field">
-              <span>Dr. Siti Aminah</span><span class="bl-auto-tag">Auto</span>
+              <span><?php echo htmlspecialchars($current_user_display); ?></span><span class="bl-auto-tag">Auto</span>
             </div>
           </div>
 
