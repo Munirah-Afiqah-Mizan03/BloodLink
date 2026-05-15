@@ -14,7 +14,7 @@ $success   = false;
 
 // ── HANDLE SUBMIT ─────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $first_name   = trim($_POST['first_name']   ?? '');
+    $first_name   = trim($_POST['first_name']    ?? '');
     $last_name    = trim($_POST['last_name']     ?? '');
     $dob          = trim($_POST['dob']           ?? '');
     $gender       = trim($_POST['gender']        ?? '');
@@ -27,7 +27,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password     = $_POST['password']           ?? '';
     $confirm_pass = $_POST['confirm_password']   ?? '';
     $blood_type   = trim($_POST['blood_type']    ?? '');
-    $weight       = trim($_POST['weight']        ?? '');
     $health_status= trim($_POST['health_status'] ?? 'Healthy');
     $last_donation= trim($_POST['last_donation'] ?? '');
     $consent      = isset($_POST['consent']);
@@ -42,8 +41,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Please enter a valid email address.';
     if (!$phone)       $errors[] = 'Phone number is required.';
     if (!$blood_type)  $errors[] = 'Blood type is required.';
-    if (!$weight || !is_numeric($weight) || $weight < 45)
-                       $errors[] = 'Weight must be a number and at least 45 kg to be eligible.';
     if (!$password)    $errors[] = 'Password is required.';
     elseif (strlen($password) < 6) $errors[] = 'Password must be at least 6 characters.';
     elseif ($password !== $confirm_pass) $errors[] = 'Passwords do not match.';
@@ -84,9 +81,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $ins_user->bind_param("sssss", $email, $hashed, $full_name, $blood_type, $ic_number);
             $ins_user->execute();
 
-            // 2. bl_donors — generate donor_id
-            $last_row = $conn->query("SELECT donor_id FROM bl_donors ORDER BY id DESC LIMIT 1")->fetch_assoc();
-            $next_num = $last_row ? intval(substr($last_row['donor_id'], 2)) + 1 : 1;
+            // 2. bl_donors — generate donor_id 
+            // This grabs the absolute highest number regardless of insert order
+            $max_query = $conn->query("SELECT MAX(CAST(SUBSTRING(donor_id, 3) AS UNSIGNED)) as max_num FROM bl_donors");
+            $max_row = $max_query->fetch_assoc();
+            $next_num = ($max_row && $max_row['max_num']) ? $max_row['max_num'] + 1 : 1;
             $donor_id = 'D-' . str_pad($next_num, 4, '0', STR_PAD_LEFT);
 
             $ins_donor = $conn->prepare(
@@ -141,7 +140,6 @@ $health_opts = ['Healthy' => 'Healthy — eligible to donate', 'Under Medication
 </head>
 <body>
 
-<!-- Top bar -->
 <div class="bl-reg-header">
   <div class="bl-reg-logo">
     <div class="bl-reg-logo-icon">
@@ -172,7 +170,6 @@ $health_opts = ['Healthy' => 'Healthy — eligible to donate', 'Under Medication
 
   <?php else: ?>
 
-  <!-- Errors -->
   <?php if (!empty($errors)): ?>
   <div class="bl-notice bl-notice-error" style="margin-bottom:1.25rem;flex-direction:column;align-items:flex-start;gap:4px">
     <?php foreach($errors as $e): ?>
@@ -184,7 +181,6 @@ $health_opts = ['Healthy' => 'Healthy — eligible to donate', 'Under Medication
   <form method="POST" action="register.php">
   <div class="bl-card">
 
-    <!-- PERSONAL DETAILS -->
     <div class="bl-section">
       <div class="bl-section-title" style="margin-bottom:1.25rem">
         <div class="bl-bar"></div><h3>Personal details</h3>
@@ -246,7 +242,6 @@ $health_opts = ['Healthy' => 'Healthy — eligible to donate', 'Under Medication
       </div>
     </div>
 
-    <!-- CONTACT & ACCOUNT -->
     <div class="bl-section">
       <div class="bl-section-title" style="margin-bottom:1.25rem">
         <div class="bl-bar"></div><h3>Contact &amp; account</h3>
@@ -279,7 +274,6 @@ $health_opts = ['Healthy' => 'Healthy — eligible to donate', 'Under Medication
       </div>
     </div>
 
-    <!-- HEALTH INFORMATION -->
     <div class="bl-section bl-section-muted">
       <div class="bl-section-title" style="margin-bottom:1.25rem">
         <div class="bl-bar"></div><h3>Health information</h3>
@@ -295,13 +289,6 @@ $health_opts = ['Healthy' => 'Healthy — eligible to donate', 'Under Medication
               <?php echo (($_POST['blood_type'] ?? '') === $bt) ? 'selected' : ''; ?>><?php echo $bt; ?></option>
             <?php endforeach; ?>
           </select>
-        </div>
-
-        <div class="bl-field">
-          <label>Weight (kg) <span class="req">*</span></label>
-          <input type="number" name="weight" placeholder="e.g. 65" min="45" max="300"
-                 value="<?php echo htmlspecialchars($_POST['weight'] ?? ''); ?>">
-          <p class="bl-hint">Minimum 45 kg required to donate</p>
         </div>
 
         <div class="bl-field">
@@ -324,7 +311,6 @@ $health_opts = ['Healthy' => 'Healthy — eligible to donate', 'Under Medication
       </div>
     </div>
 
-    <!-- CONSENT & SUBMIT -->
     <div class="bl-footer">
       <label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer;font-size:12px;color:var(--text-muted);line-height:1.5;max-width:560px">
         <input type="checkbox" name="consent" style="margin-top:2px;accent-color:var(--red);flex-shrink:0"
@@ -342,8 +328,13 @@ $health_opts = ['Healthy' => 'Healthy — eligible to donate', 'Under Medication
       </div>
     </div>
 
-  </div><!-- /bl-card -->
-  </form>
+  </div></form>
+
+  <?php endif; ?>
+</div>
+
+</body>
+</html>
 
   <?php endif; ?>
 </div>
