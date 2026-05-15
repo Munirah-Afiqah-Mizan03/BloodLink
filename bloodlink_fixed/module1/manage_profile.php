@@ -107,14 +107,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 // ── HANDLE: Update Health Status ──────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_health') {
     $blood_type    = trim($_POST['blood_type']    ?? '');
-    $weight        = trim($_POST['weight']        ?? '');
     $health_status = trim($_POST['health_status'] ?? '');
 
     $valid_blood = ['A+','A-','B+','B-','O+','O-','AB+','AB-'];
     $valid_health = ['Healthy','Under Medication','Not Eligible'];
 
     if (!in_array($blood_type, $valid_blood))   $errors[] = 'Please select a valid blood type.';
-    if (!is_numeric($weight) || $weight < 1)    $errors[] = 'Please enter a valid weight.';
     if (!in_array($health_status, $valid_health)) $errors[] = 'Please select a valid health status.';
 
     if (empty($errors)) {
@@ -166,7 +164,6 @@ $health_labels = [
     </div>
     <?php endif; ?>
 
-    <!-- Errors -->
     <?php if (!empty($errors)): ?>
     <div class="bl-notice bl-notice-error" style="margin-bottom:1.25rem;flex-direction:column;align-items:flex-start;gap:4px">
       <?php foreach($errors as $e): ?>
@@ -175,7 +172,6 @@ $health_labels = [
     </div>
     <?php endif; ?>
 
-    <!-- Top Hero (Upcoming Events style) -->
     <div class="bl-top-hero">
       <div>
         <h2>Manage Profile</h2>
@@ -183,7 +179,6 @@ $health_labels = [
       </div>
     </div>
 
-    <!-- Status Bar -->
     <div class="bl-stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:1.5rem">
       <div class="bl-stat bl-stat-red">
         <p>Blood Type</p>
@@ -211,7 +206,6 @@ $health_labels = [
       </div>
     </div>
 
-    <!-- SECTION: Personal Info (read-only) -->
     <div class="bl-card" style="margin-bottom:1.25rem">
       <div class="bl-section">
         <div class="bl-section-hd">
@@ -239,7 +233,6 @@ $health_labels = [
       </div>
     </div>
 
-    <!-- SECTION: Contact Details (editable) -->
     <div class="bl-card" style="margin-bottom:1.25rem">
       <form method="POST" action="manage_profile.php">
         <input type="hidden" name="action" value="update_contact">
@@ -284,7 +277,6 @@ $health_labels = [
       </form>
     </div>
 
-    <!-- SECTION: Health Information (editable) -->
     <div class="bl-card">
       <form method="POST" action="manage_profile.php">
         <input type="hidden" name="action" value="update_health">
@@ -294,6 +286,7 @@ $health_labels = [
             <div class="bl-bar"></div><h3>Health status</h3>
           </div>
           <div class="bl-grid-2">
+            
             <div class="bl-field">
               <label>Blood type <span class="req">*</span></label>
               <select name="blood_type">
@@ -303,13 +296,8 @@ $health_labels = [
                 <?php endforeach; ?>
               </select>
             </div>
+            
             <div class="bl-field">
-              <label>Weight (kg)</label>
-              <input type="number" name="weight" min="45" max="300"
-                     value="<?php echo htmlspecialchars($donor['weight'] ?? ''); ?>"
-                     placeholder="e.g. 65">
-            </div>
-            <div class="bl-field bl-col-2">
               <label>Current health status <span class="req">*</span></label>
               <select name="health_status">
                 <?php foreach($health_opts as $opt): ?>
@@ -318,6 +306,7 @@ $health_labels = [
                 <?php endforeach; ?>
               </select>
             </div>
+
           </div>
         </div>
 
@@ -339,6 +328,5 @@ $health_labels = [
       </form>
     </div>
 
-  </div><!-- /bl-main -->
+  </div><?php include 'footer.php'; ?>
 
-<?php include 'footer.php'; ?>
