@@ -1,34 +1,68 @@
 <?php
 // BloodLink — Module 2: Add New Event
-session_start();
+
 require_once 'db.php';
+bl_require_role('medical_officer');
 
 $activePage = 'events';
 $pageTitle  = 'Add New Event';
 $errors     = [];
 
+$current_user_display = trim($_SESSION['full_name'] ?? '');
+if (($_SESSION['role'] ?? '') === 'medical_officer' && $current_user_display && !preg_match('/^dr\b/i', $current_user_display)) {
+    $current_user_display = 'Dr. ' . $current_user_display;
+}
+if (!$current_user_display) $current_user_display = 'System';
+
 // ── HANDLE FORM SUBMIT ────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    bl_verify_csrf($_POST['csrf_token'] ?? null);
     $event_name  = trim($_POST['event_name']  ?? '');
     $event_date  = trim($_POST['event_date']  ?? '');
     $location    = trim($_POST['location']    ?? '');
     $partner     = trim($_POST['partner']     ?? '');
     $description = trim($_POST['description'] ?? '');
     $status      = trim($_POST['status']      ?? 'Upcoming');
-    $created_by  = 'Dr. Siti Aminah'; // Replace with session user
+    $created_by  = $current_user_display;
 
-    // Validate
-    if (!$event_name) $errors[] = 'Event name is required.';
-    if (!$event_date) $errors[] = 'Event date is required.';
-    if (!$location)   $errors[] = 'Location is required.';
+    // ── Status whitelist (Tactic: Field Constraints) ──────────
+    $allowed_statuses = ['Upcoming', 'Completed', 'Cancelled'];
+    if (!in_array($status, $allowed_statuses, true)) {
+        $status = 'Upcoming'; // reset tampered value to safe default
+    }
+
+    // ── Server-side validation (Tactic: Server-Side Input Validation) ─
+    if (!$event_name) {
+        $errors[] = 'Event name is required.';
+    } elseif (mb_strlen($event_name) > 150) {
+        $errors[] = 'Event name must not exceed 150 characters.';
+    }
+
+    if (!$event_date) {
+        $errors[] = 'Event date is required.';
+    } else {
+        // Validate Y-m-d format and logical correctness
+        $dt = DateTime::createFromFormat('Y-m-d', $event_date);
+        if (!$dt || $dt->format('Y-m-d') !== $event_date) {
+            $errors[] = 'Event date must be a valid date in YYYY-MM-DD format.';
+        } elseif ($event_date < date('Y-m-d')) {
+            $errors[] = 'Event date cannot be set in the past.';
+        }
+    }
+
+    if (!$location) {
+        $errors[] = 'Location is required.';
+    } elseif (mb_strlen($location) > 200) {
+        $errors[] = 'Location must not exceed 200 characters.';
+    }
 
     if (empty($errors)) {
         // Generate next event_id
-        $last = $conn->query("SELECT event_id FROM events ORDER BY id DESC LIMIT 1")->fetch_assoc();
+        $last = $conn->query("SELECT event_id FROM bl_events ORDER BY id DESC LIMIT 1")->fetch_assoc();
         $next_num = $last ? intval(substr($last['event_id'], 3)) + 1 : 1;
         $event_id = 'EV-' . str_pad($next_num, 4, '0', STR_PAD_LEFT);
 
-        $ins = $conn->prepare("INSERT INTO events
+        $ins = $conn->prepare("INSERT INTO bl_events
             (event_id, event_name, event_date, location, partner, description, status, created_by)
             VALUES (?,?,?,?,?,?,?,?)");
         $ins->bind_param("ssssssss",
@@ -56,19 +90,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <span>Add new event</span>
     </div>
 
-    <!-- Header -->
-    <div class="bl-page-header">
+    <!-- Top Hero (Upcoming Events style) -->
+    <div class="bl-top-hero">
       <div>
-        <h1>Add new event</h1>
+        <h2>Add new event</h2>
         <p>Fill in the details below to create a new blood donation event</p>
       </div>
-      <div class="bl-new-badge">
-        <div class="bl-new-dot">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-            <path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
-          </svg>
+      <div class="bl-top-hero-actions">
+        <div class="bl-new-badge">
+          <div class="bl-new-dot">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+              <path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <span>New Event</span>
         </div>
-        <span>New Event</span>
       </div>
     </div>
 
@@ -83,6 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <!-- Form -->
     <form method="POST" action="add_event.php">
+    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(bl_csrf_token()); ?>">
     <div class="bl-card">
 
       <!-- Section 1: Event Details -->
@@ -162,7 +199,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <div class="bl-field">
             <label>Created by</label>
             <div class="bl-auto-field">
-              <span>Dr. Siti Aminah</span><span class="bl-auto-tag">Auto</span>
+              <span><?php echo htmlspecialchars($current_user_display); ?></span><span class="bl-auto-tag">Auto</span>
             </div>
           </div>
           <div class="bl-field">

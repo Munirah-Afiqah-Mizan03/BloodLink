@@ -1,12 +1,27 @@
 <?php
-// BloodLink — Database Connection
-define('DB_HOST', 'localhost');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_NAME', 'module2');
+// BloodLink — Module 2 DB bridge
+require_once __DIR__ . '/../config.php';
 
-$conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
-if ($conn->connect_error) {
-    die('Database connection failed: ' . $conn->connect_error);
+// ── Security helpers (ISO 25010: Security/Reliability) ─────────
+function bl_require_role(string $role): void {
+    if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== $role) {
+        header('Location: ../login.php');
+        exit;
+    }
 }
-$conn->set_charset('utf8mb4');
+
+function bl_csrf_token(): string {
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+function bl_verify_csrf(?string $token): void {
+    $sessionToken = $_SESSION['csrf_token'] ?? '';
+    if (!$token || !$sessionToken || !hash_equals($sessionToken, $token)) {
+        http_response_code(403);
+        die('Invalid CSRF token.');
+    }
+}
+?>

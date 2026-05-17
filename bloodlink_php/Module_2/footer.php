@@ -1,6 +1,3 @@
-
-</div><!-- /bl-layout -->
-
-<script src="assets/js/main.js"></script>
-</body>
-</html>
+<?php
+$base_url = '../';
+include __DIR__ . '/../includes/footer.php';

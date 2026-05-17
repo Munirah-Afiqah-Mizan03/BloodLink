@@ -1,7 +1,8 @@
 <?php
 // BloodLink — Module 2: Edit Event
-session_start();
+
 require_once 'db.php';
+bl_require_role('medical_officer');
 
 $activePage = 'events';
 $pageTitle  = 'Edit Event';
@@ -11,7 +12,7 @@ $id = intval($_GET['id'] ?? 0);
 if (!$id) { header('Location: index.php'); exit; }
 
 // Fetch existing event
-$stmt = $conn->prepare("SELECT * FROM events WHERE id = ?");
+$stmt = $conn->prepare("SELECT * FROM bl_events WHERE id = ?");
 $stmt->bind_param("i", $id);
 $stmt->execute();
 $event = $stmt->get_result()->fetch_assoc();
@@ -19,6 +20,7 @@ if (!$event) { header('Location: index.php'); exit; }
 
 // ── HANDLE SUBMIT ─────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    bl_verify_csrf($_POST['csrf_token'] ?? null);
     $event_name  = trim($_POST['event_name']  ?? '');
     $event_date  = trim($_POST['event_date']  ?? '');
     $location    = trim($_POST['location']    ?? '');
@@ -26,12 +28,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $description = trim($_POST['description'] ?? '');
     $status      = trim($_POST['status']      ?? '');
 
-    if (!$event_name) $errors[] = 'Event name is required.';
-    if (!$event_date) $errors[] = 'Event date is required.';
-    if (!$location)   $errors[] = 'Location is required.';
+    // ── Status whitelist (Tactic: Field Constraints) ──────────
+    $allowed_statuses = ['Upcoming', 'Completed', 'Cancelled'];
+    if (!in_array($status, $allowed_statuses, true)) {
+        $errors[] = 'Invalid status value selected.';
+    }
+
+    // ── Server-side validation (Tactic: Server-Side Input Validation) ─
+    if (!$event_name) {
+        $errors[] = 'Event name is required.';
+    } elseif (mb_strlen($event_name) > 150) {
+        $errors[] = 'Event name must not exceed 150 characters.';
+    }
+
+    if (!$event_date) {
+        $errors[] = 'Event date is required.';
+    } else {
+        // Validate Y-m-d format and logical correctness
+        $dt = DateTime::createFromFormat('Y-m-d', $event_date);
+        if (!$dt || $dt->format('Y-m-d') !== $event_date) {
+            $errors[] = 'Event date must be a valid date in YYYY-MM-DD format.';
+        }
+    }
+
+    if (!$location) {
+        $errors[] = 'Location is required.';
+    } elseif (mb_strlen($location) > 200) {
+        $errors[] = 'Location must not exceed 200 characters.';
+    }
 
     if (empty($errors)) {
-        $upd = $conn->prepare("UPDATE events SET
+        $upd = $conn->prepare("UPDATE bl_events SET
             event_name=?, event_date=?, location=?, partner=?,
             description=?, status=?, updated_at=NOW()
             WHERE id=?");
@@ -70,22 +97,24 @@ $vol_count = $vc->get_result()->fetch_assoc()['c'];
       <span>Edit event</span>
     </div>
 
-    <!-- Header -->
-    <div class="bl-page-header">
+    <!-- Top Hero (Upcoming Events style) -->
+    <div class="bl-top-hero">
       <div>
-        <h1>Edit event</h1>
-        <p>Update information for event <strong style="color:#E57373">#<?php echo htmlspecialchars($event['event_id']); ?></strong></p>
+        <h2>Edit event</h2>
+        <p>Update information for event <strong style="color:rgba(255,255,255,.92)">#<?php echo htmlspecialchars($event['event_id']); ?></strong></p>
       </div>
-      <div class="bl-status-badge">
-        <span>Current status:</span>
-        <?php
-          $st_class = [
-            'Upcoming'  => 'bl-badge-upcoming',
-            'Completed' => 'bl-badge-completed',
-            'Cancelled' => 'bl-badge-cancelled',
-          ][$event['status']] ?? 'bl-badge-pending';
-        ?>
-        <span class="bl-badge <?php echo $st_class; ?>"><?php echo htmlspecialchars($event['status']); ?></span>
+      <div class="bl-top-hero-actions">
+        <div class="bl-status-badge">
+          <span style="color:rgba(255,255,255,.9)">Current status:</span>
+          <?php
+            $st_class = [
+              'Upcoming'  => 'bl-badge-upcoming',
+              'Completed' => 'bl-badge-completed',
+              'Cancelled' => 'bl-badge-cancelled',
+            ][$event['status']] ?? 'bl-badge-pending';
+          ?>
+          <span class="bl-badge <?php echo $st_class; ?>"><?php echo htmlspecialchars($event['status']); ?></span>
+        </div>
       </div>
     </div>
 
@@ -110,6 +139,7 @@ $vol_count = $vc->get_result()->fetch_assoc()['c'];
 
     <!-- Form -->
     <form method="POST" action="edit_event.php?id=<?php echo $id; ?>">
+    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(bl_csrf_token()); ?>">
     <div class="bl-card">
 
       <!-- Section 1: Event Details -->
@@ -188,7 +218,7 @@ $vol_count = $vc->get_result()->fetch_assoc()['c'];
           <div class="bl-field">
             <label>Created by</label>
             <div class="bl-auto-field">
-              <span><?php echo htmlspecialchars($event['created_by'] ?? 'Dr. Siti Aminah'); ?></span>
+              <span><?php echo htmlspecialchars($event['created_by'] ?? ''); ?></span>
               <span class="bl-auto-tag">Auto</span>
             </div>
           </div>

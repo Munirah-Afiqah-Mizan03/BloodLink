@@ -1,46 +1,57 @@
 <?php
 // BloodLink — Module 2: Assign Volunteers to Event
-session_start();
+
 require_once 'db.php';
+bl_require_role('medical_officer');
 
 $activePage = 'events';
 $pageTitle  = 'Assign Volunteers';
 $errors     = [];
 $success    = false;
 
+$current_user_display = trim($_SESSION['full_name'] ?? '');
+if (($_SESSION['role'] ?? '') === 'medical_officer' && $current_user_display && !preg_match('/^dr\b/i', $current_user_display)) {
+    $current_user_display = 'Dr. ' . $current_user_display;
+}
+if (!$current_user_display) $current_user_display = 'System';
+
 $id = intval($_GET['id'] ?? 0);
 if (!$id) { header('Location: index.php'); exit; }
 
 // Fetch event
-$stmt = $conn->prepare("SELECT * FROM events WHERE id = ?");
+$stmt = $conn->prepare("SELECT * FROM bl_events WHERE id = ?");
 $stmt->bind_param("i", $id);
 $stmt->execute();
 $event = $stmt->get_result()->fetch_assoc();
 if (!$event) { header('Location: index.php'); exit; }
 
 // ── HANDLE REMOVE VOLUNTEER ───────────────────────────────────
-if (isset($_GET['remove'])) {
-    $remove_id = intval($_GET['remove']);
-    $rem = $conn->prepare("DELETE FROM event_volunteers WHERE id = ? AND event_id = ?");
-    $rem->bind_param("ii", $remove_id, $id);
-    $rem->execute();
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['remove_assignment_id'])) {
+    bl_verify_csrf($_POST['csrf_token'] ?? null);
+    $remove_id = intval($_POST['remove_assignment_id']);
+    if ($remove_id > 0) {
+        $rem = $conn->prepare("DELETE FROM event_volunteers WHERE id = ? AND event_id = ?");
+        $rem->bind_param("ii", $remove_id, $id);
+        $rem->execute();
+    }
     $_SESSION['flash_vol'] = ['type'=>'success', 'msg'=>'Volunteer removed successfully.'];
     header("Location: assign_volunteers.php?id=$id");
     exit;
 }
 
 // ── HANDLE ASSIGN ─────────────────────────────────────────────
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assign_submit'])) {
+    bl_verify_csrf($_POST['csrf_token'] ?? null);
     $vol_name    = trim($_POST['vol_name']    ?? '');
     $vol_role    = trim($_POST['vol_role']    ?? '');
-    $assigned_by = 'Dr. Siti Aminah';
+    $assigned_by = $current_user_display;
 
     if (!$vol_name) $errors[] = 'Volunteer name is required.';
     if (!$vol_role) $errors[] = 'Please select a role.';
 
     if (empty($errors)) {
         // Find volunteer by name (partial match)
-        $vq = $conn->prepare("SELECT id, volunteer_id, full_name FROM volunteers WHERE full_name LIKE ? LIMIT 1");
+        $vq = $conn->prepare("SELECT id, volunteer_id, full_name FROM bl_volunteers WHERE full_name LIKE ? LIMIT 1");
         $like = "%$vol_name%";
         $vq->bind_param("s", $like);
         $vq->execute();
@@ -75,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $assigned_stmt = $conn->prepare("SELECT ev.id AS assign_id, v.full_name, v.volunteer_id AS vol_code,
     v.phone, ev.role, ev.assigned_by, ev.assigned_at
     FROM event_volunteers ev
-    JOIN volunteers v ON ev.volunteer_id = v.id
+    JOIN bl_volunteers v ON ev.volunteer_id = v.id
     WHERE ev.event_id = ?
     ORDER BY ev.assigned_at DESC");
 $assigned_stmt->bind_param("i", $id);
@@ -83,7 +94,7 @@ $assigned_stmt->execute();
 $assigned = $assigned_stmt->get_result();
 
 // All volunteers for autocomplete hint
-$all_vols = $conn->query("SELECT full_name, volunteer_id FROM volunteers ORDER BY full_name");
+$all_vols = $conn->query("SELECT full_name, volunteer_id FROM bl_volunteers ORDER BY full_name");
 
 // Flash from redirect
 $flash_vol = $_SESSION['flash_vol'] ?? null;
@@ -110,15 +121,17 @@ $roles = ['Registration Desk','Medical Assistant','Blood Collection','Refreshmen
       <span>Assign volunteers</span>
     </div>
 
-    <!-- Header -->
-    <div class="bl-page-header">
+    <!-- Top Hero (Upcoming Events style) -->
+    <div class="bl-top-hero">
       <div>
-        <h1>Assign volunteers</h1>
-        <p>Manage volunteer team for <strong style="color:#E57373"><?php echo htmlspecialchars($event['event_name']); ?></strong></p>
+        <h2>Assign volunteers</h2>
+        <p>Manage volunteer team for <strong style="color:rgba(255,255,255,.92)"><?php echo htmlspecialchars($event['event_name']); ?></strong></p>
       </div>
-      <div class="bl-status-badge">
-        <span>Event status:</span>
-        <span class="bl-badge <?php echo $st_class; ?>"><?php echo htmlspecialchars($event['status']); ?></span>
+      <div class="bl-top-hero-actions">
+        <div class="bl-status-badge">
+          <span style="color:rgba(255,255,255,.9)">Event status:</span>
+          <span class="bl-badge <?php echo $st_class; ?>"><?php echo htmlspecialchars($event['status']); ?></span>
+        </div>
       </div>
     </div>
 
@@ -182,14 +195,19 @@ $roles = ['Registration Desk','Medical Assistant','Blood Collection','Refreshmen
                   </small>
                 </div>
                 <span class="bl-vol-role"><?php echo htmlspecialchars($v['role']); ?></span>
-                <a href="assign_volunteers.php?id=<?php echo $id; ?>&remove=<?php echo $v['assign_id']; ?>"
-                   class="bl-vol-remove bl-vol-remove-btn"
-                   title="Remove volunteer"
-                   onclick="return confirm('Remove <?php echo htmlspecialchars(addslashes($v['full_name'])); ?> from this event?')">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                  </svg>
-                </a>
+                <form method="POST" action="assign_volunteers.php?id=<?php echo $id; ?>" style="display:inline">
+                  <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(bl_csrf_token()); ?>">
+                  <input type="hidden" name="remove_assignment_id" value="<?php echo intval($v['assign_id']); ?>">
+                  <button type="submit"
+                          class="bl-vol-remove bl-vol-remove-btn"
+                          title="Remove volunteer"
+                          onclick="return confirm('Remove <?php echo htmlspecialchars(addslashes($v['full_name'])); ?> from this event?')"
+                          style="background:none;border:none;padding:0">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                  </button>
+                </form>
               </div>
               <?php endwhile; ?>
             </div>
@@ -207,6 +225,8 @@ $roles = ['Registration Desk','Medical Assistant','Blood Collection','Refreshmen
             </div>
 
             <form method="POST" action="assign_volunteers.php?id=<?php echo $id; ?>">
+              <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(bl_csrf_token()); ?>">
+              <input type="hidden" name="assign_submit" value="1">
               <div class="bl-field" style="margin-bottom:.875rem">
                 <label>Volunteer name <span class="req">*</span></label>
                 <input type="text" name="vol_name"
